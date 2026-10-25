@@ -44,6 +44,7 @@ curl -i -X POST 'http://127.0.0.1:9292/sms/' \
 It works on `Android` and will bring this to `Linux` & `Windows` too.
 - [FastAPI](https://github.com/fastapi/fastapi) for the API layer.
 - [KivyMD](https://github.com/kivymd/kivymd) and few [Kivy](https://github.com/kivy) components for the UI and building the app.
+- SMS via [pyjnius](https://github.com/kivy/pyjnius) on `Android`.
 
 ### 📋 Future plans
 

@@ -14,26 +14,38 @@ import uvicorn
 
 # local imports
 from services.smsApi import send_sms
-from services.pathMgr import get_user_data_dir
 from services.logSvc import LogService
+
+# OS specific
+try:
+    from kivy.utils import platform
+except ImportError:
+    if sys.platform.startswith("win"):
+        platform = "win"
+    elif sys.platform.startswith("linux"):
+        platform = "linux"
+    else:
+        platform = "unknown"
 
 ## global vars / obj
 app_name = "opensms"
-platform = "linux"
 logger = None
 
-# Set the path
-config_dir = "./config"
+## OS specific setups
+
+# for android
+if platform == "android":
+    from android.storage import app_storage_path
+    from jnius import autoclass
+    base_path = app_storage_path()
+#for other platforms like windows or linux
+else:
+    from services.pathMgr import get_user_data_dir
+    base_path = get_user_data_dir(app_name)
+
+config_dir = join(base_path, 'config')
 
 ## Functions
-
-def set_config_path(config_path:str):
-    global config_dir
-    config_dir = config_path
-
-def set_api_os(os_flavour:str):
-    global platform
-    platform = os_flavour
 
 def set_api_logger(log_obj:LogService):
     global logger
@@ -119,16 +131,32 @@ class PosiApiServer:
     # Internal server runner
     # ----------------------------
     def _run(self, port=None):
+        final_port = port if port else self.port
         config = uvicorn.Config(
             app,
             host=self.host,
-            port=port if port else self.port,
+            port=final_port,
             log_level="info",
             loop="asyncio"
         )
-        self.server = uvicorn.Server(config)
-        app.state.server = self  # attach instance
-        asyncio.run(self.server.serve())
+        try:
+            self.server = uvicorn.Server(config)
+            app.state.server = self  # attach instance
+            asyncio.run(self.server.serve())
+        except OSError as e:
+            err_msg = f"Error while port binding {final_port}: {e}"
+            print(f"Error while port binding {final_port}: {e}")
+            log_activities(f"Server Error: {err_msg}")
+            if self.controlCallback:
+                self.controlCallback("bind_error", str(e))
+        except Exception as e:
+            err_msg = f"Error while starting the server: {e}"
+            print(f"Server error: {e}")
+            log_activities(err_msg)
+            if self.controlCallback:
+                self.controlCallback("error", str(e))
+        finally:
+            self.server = None
 
     # ----------------------------
     # Public start

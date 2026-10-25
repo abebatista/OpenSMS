@@ -80,16 +80,16 @@ Builder.load_string('''
 
             MDListItem:
                 MDListItemLeadingIcon:
-                    icon: "api"
+                    icon: "server-network"
                 MDListItemHeadlineText:
                     text: "Port Number"
                 MDListItemSupportingText:
-                    text: "Needs a Stop-Start"
+                    text: "(1025 - 65535)"
                 MDListItemTertiaryText:
-                    text: "Should be > 1024"
+                    text: "Restart the server"
                 MDTextField:
                     id: port_no_inp
-                    mode: "filled"
+                    mode: "outlined"
                     input_filter: 'int'
 
             MDListItem:

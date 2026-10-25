@@ -1,5 +1,3 @@
-from kivy.utils import platform
-
 from os.path import join, abspath, exists, dirname
 from threading import Thread
 
@@ -7,8 +5,19 @@ import json
 import time
 import sys
 
+# OS specific
+try:
+    from kivy.utils import platform
+except ImportError:
+    if sys.platform.startswith("win"):
+        platform = "win"
+    elif sys.platform.startswith("linux"):
+        platform = "linux"
+    else:
+        platform = "unknown"
+
 # local imports
-from services.postApi import PosiApiServer, set_config_path, set_api_os, set_api_logger
+from services.postApi import PosiApiServer, set_api_logger
 from services.logSvc import LogService
 
 # global vars
@@ -21,6 +30,7 @@ api_started = False
 log_obj = LogService(app_name, platform)
 
 ## OS specific setups
+
 # for android
 if platform == "android":
     from android.storage import app_storage_path
@@ -35,8 +45,6 @@ config_dir = join(base_path, 'config')
 if not exists(config_dir):
     import os
     os.makedirs(config_dir, exist_ok=True)
-set_config_path(config_dir)
-set_api_os(platform)
 set_api_logger(log_obj)
 req_file = join(config_dir, "request.json")
 resp_file = join(config_dir, "resp.json")

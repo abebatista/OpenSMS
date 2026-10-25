@@ -1,7 +1,7 @@
 import os
 os.environ['KIVY_GL_BACKEND'] = 'sdl2'
-from kivy.config import Config
-Config.set("graphics", "multisamples", "0")
+#from kivy.config import Config
+#Config.set("graphics", "multisamples", "0")
 import sys
 import json
 from threading import Thread
@@ -35,7 +35,7 @@ from screens.mainScr import ButtonControl
 from screens.settings import SettingsBox, ApiKeyTxtbox
 
 # import services
-from services.postApi import get_api_keys, set_config_path, generate_new_api_key
+from services.postApi import get_api_keys, generate_new_api_key
 
 # IMPORTANT: Set this property for keyboard behavior
 Window.softinput_mode = "below_target"
@@ -74,7 +74,7 @@ class MainScreenBox(MDBoxLayout):
                 self.bottom_pad = 48
 
 ## Global definitions
-__version__ = "0.1.1" # App version
+__version__ = "0.2.0" # App version
 
 # Determine the base path for your application's resources
 if getattr(sys, 'frozen', False):
@@ -100,6 +100,7 @@ class OpenSmsApp(MDApp):
             "app": "opensms",
             "port": 9292,
             "boot": False,
+            "permissions": False,
         }
         self.req_template = {
             "port": 9292,
@@ -153,7 +154,6 @@ class OpenSmsApp(MDApp):
             self.write_request()
             Thread(target=app_service_thread, daemon=True).start()
         # All generic things
-        set_config_path(self.config_dir)
         self.app_config = os.path.join(self.config_dir, "config.json")
         auto_start_sw = self.root.ids.settings_scr.ids.auto_start_sw
         port_no_inp = self.root.ids.settings_scr.ids.port_no_inp
@@ -162,6 +162,7 @@ class OpenSmsApp(MDApp):
                 saved_config = json.load(cf)
             self.config_template["port"] = int(saved_config["port"])
             self.config_template["boot"] = saved_config["boot"]
+            self.config_template["permissions"] = saved_config.get("permissions", False)
             print(f"start config check: {self.config_template}")
             self.req_template["port"] = int(self.config_template["port"])
             start_on_launch = self.config_template["boot"]
@@ -253,7 +254,7 @@ class OpenSmsApp(MDApp):
             self.new_api_key_pop()
 
     def check_request_android_permission(self):
-        if platform == "android":
+        if platform == "android" and not self.config_template["permissions"]:
             permission_flag = True
             for permission in self.android_permissions:
                 tmp_flag = check_permission(permission)
@@ -296,9 +297,18 @@ class OpenSmsApp(MDApp):
             ),
             MDButton(
                 MDButtonText(
-                    text="Open Settings",
+                    text="Already granted",
                     theme_text_color= "Custom",
                     text_color= "orange"
+                ),
+                style="text",
+                on_release=self.confirm_android_permissions
+            ),
+            MDButton(
+                MDButtonText(
+                    text="Open Settings",
+                    theme_text_color= "Custom",
+                    text_color= "green"
                 ),
                 style="text",
                 on_release=self.open_android_settings
@@ -311,6 +321,10 @@ class OpenSmsApp(MDApp):
             None,
             buttons
         )
+
+    def confirm_android_permissions(self, instnce=None):
+        self.config_template["permissions"] = True
+        Thread(target=self.write_app_conf, daemon=True).start()
 
     def open_android_settings(self, instance=None):
         self.txt_dialog_closer()
