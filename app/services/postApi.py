@@ -13,7 +13,7 @@ from pydantic import BaseModel
 import uvicorn
 
 # local imports
-from services.smsApi import send_sms
+from services.smsApi import send_sms, clean_and_validate_phone
 from services.logSvc import LogService
 
 # OS specific
@@ -222,16 +222,25 @@ async def process_sms_req(
     client: dict = Depends(verify_api_key)
 ):
     server: PosiApiServer = request.app.state.server
+
     client_ip = request.client.host if request.client else "unknown"
     print(f"Authenticated request from: {client_ip}")
     log_activities(f"Authenticated request from: {client_ip}")
-    stat = send_sms(item.number, item.text)
+
+    valid_phone = clean_and_validate_phone(item.number)
+    if not valid_phone:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid phone number",
+        )
+
+    stat = send_sms(valid_phone, item.text)
     if stat:
-        print(f"SMS successfully sent to: {item.number}")
-        log_activities(f"SMS successfully sent to: {item.number}")
+        print(f"SMS dispatched to: {valid_phone}")
+        log_activities(f"SMS dispatched to: {valid_phone}")
     else:
-        print(f"SMS failed to: {item.number}")
-        log_activities(f"SMS failed to: {item.number}")
+        print(f"SMS failed to: {valid_phone}")
+        log_activities(f"SMS failed to: {valid_phone}")
 
     if server.kivyCallback:
         Thread(

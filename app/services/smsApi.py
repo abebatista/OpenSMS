@@ -56,18 +56,15 @@ def send_sms(phone:str, msg:str) -> bool:
         - bool: True if the execution is successful
     """
     stat = False
-    valid_phone = clean_and_validate_phone(phone)
-    if not valid_phone:
-        return False
     if platform == "android":
         try:
             SmsManager = autoclass('android.telephony.SmsManager')
             sms_manager = SmsManager.getDefault()
             parts = sms_manager.divideMessage(msg)
             if parts.size() > 1:
-                sms_manager.sendMultipartTextMessage(valid_phone, None, parts, None, None)
+                sms_manager.sendMultipartTextMessage(phone, None, parts, None, None)
             else:
-                sms_manager.sendTextMessage(valid_phone, None, msg, None, None)
+                sms_manager.sendTextMessage(phone, None, msg, None, None)
             stat = True
         except Exception as e:
             print("SMS ❌ Failed:", e)

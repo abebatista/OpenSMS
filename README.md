@@ -3,6 +3,14 @@
 # 📨 OpenSMS
 An open-source solution to host a `SMS` API server locally.
 
+<details>
+  <summary>Keeping things simple</summary>
+
+  - It is meant to be used with a backend or application layer in the local network while `OpenSMS` serves as the SMS gateway / API.
+  - To keep it simple, rate limiting or other restrictions may be applied at the application layer (not adding in `OpenSMS` app itself).
+</details>
+
+
 ### 🤔 Why would you choose our app? (Features)
 👉 Turns your `Android` phone into a SMS API server. <br>
 👉 Open-source, No advertisements and privacy focused.
@@ -49,6 +57,11 @@ It works on `Android` and will bring this to `Linux` & `Windows` too.
 ### 📋 Future plans
 
 1. Bring this SMS API option to Desktop platforms. We will leverage [Quectel EC200U](https://www.quectel.com/product/lte-ec200u-series/) based USB development boards to send SMS.
+
+
+## 💌 Contact Details
+- Developer & Author: [Somnath Das](https://cv.daslearning.in/)
+- [Contact Us](https://daslearning.in/contact/)
 
 -----
 
