@@ -16,10 +16,13 @@ from kivy.clock import Clock
 from kivy.properties import StringProperty, NumericProperty, ObjectProperty, BooleanProperty, ColorProperty
 
 # debug
-from kivy.graphics.opengl import glGetString, GL_VENDOR, GL_RENDERER, GL_VERSION
-print("GL_VENDOR:", glGetString(GL_VENDOR))
-print("GL_RENDERER:", glGetString(GL_RENDERER))
-print("GL_VERSION:", glGetString(GL_VERSION))
+try:
+    from kivy.graphics.opengl import glGetString, GL_VENDOR, GL_RENDERER, GL_VERSION
+    print("GL_VENDOR:", glGetString(GL_VENDOR))
+    print("GL_RENDERER:", glGetString(GL_RENDERER))
+    print("GL_VERSION:", glGetString(GL_VERSION))
+except Exception as e:
+    print(f"OpenGL query error: {e}")
 
 from kivymd.uix.widget import MDWidget
 from kivymd.app import MDApp
@@ -37,6 +40,7 @@ from screens.settings import SettingsBox, ApiKeyTxtbox
 # import services
 from services.postApi import get_api_keys, generate_new_api_key
 from services.netSvc import get_network_ips
+from services.config import __version__, app_name
 
 # IMPORTANT: Set this property for keyboard behavior
 Window.softinput_mode = "below_target"
@@ -75,7 +79,6 @@ class MainScreenBox(MDBoxLayout):
                 self.bottom_pad = 48
 
 ## Global definitions
-__version__ = "0.2.0" # App version
 
 # Determine the base path for your application's resources
 if getattr(sys, 'frozen', False):
@@ -98,7 +101,7 @@ class OpenSmsApp(MDApp):
         self.key_exists = False
         self.api_key = None
         self.config_template = {
-            "app": "opensms",
+            "app": app_name,
             "port": 9292,
             "boot": False,
             "permissions": False,
@@ -121,7 +124,7 @@ class OpenSmsApp(MDApp):
         if platform == "android":
             file_m_height = 0.9
             from android.storage import app_storage_path
-            sdk_version = 28
+            sdk_version = 33
             try:
                 VERSION = autoclass('android.os.Build$VERSION')
                 sdk_version = VERSION.SDK_INT
@@ -130,7 +133,9 @@ class OpenSmsApp(MDApp):
             except Exception as e:
                 print(f"Could not check the android SDK version: {e}")
                 #self.show_toast_msg(f"Error checking SDK: {e}", is_error=True)
-            self.android_permissions = [Permission.WAKE_LOCK, Permission.SEND_SMS, Permission.POST_NOTIFICATIONS]
+            self.android_permissions = [Permission.WAKE_LOCK, Permission.SEND_SMS]
+            if sdk_version >= 33:
+                self.android_permissions.extend([Permission.POST_NOTIFICATIONS])
             request_permissions(self.android_permissions)
             self.internal_storage = app_storage_path()
             self.config_dir = os.path.join(self.internal_storage, 'config')
@@ -159,7 +164,7 @@ class OpenSmsApp(MDApp):
         auto_start_sw = self.root.ids.settings_scr.ids.auto_start_sw
         port_no_inp = self.root.ids.settings_scr.ids.port_no_inp
         if os.path.exists(self.app_config):
-            with open(self.app_config, "r") as cf:
+            with open(self.app_config, "r", encoding="utf-8") as cf:
                 saved_config = json.load(cf)
             self.config_template["port"] = int(saved_config["port"])
             self.config_template["boot"] = saved_config["boot"]
@@ -207,7 +212,7 @@ class OpenSmsApp(MDApp):
             resp = None
             if os.path.exists(self.resp_path):
                 try:
-                    with open(self.resp_path, "r") as rf:
+                    with open(self.resp_path, "r", encoding="utf-8") as rf:
                         resp = json.load(rf)
                     if resp:
                         server_stat = resp.get("server", "")

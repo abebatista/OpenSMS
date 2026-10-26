@@ -2,6 +2,10 @@
 
 ## Changes
 
+### 0.2.1
+- Fixing permission requirement as per Android version.
+- A single config source for the entire app.
+
 ### 0.2.0
 - Adding a check for correct mobile number formatting.
 - SMS in parts if it exits character limit.

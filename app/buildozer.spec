@@ -38,7 +38,7 @@ source.exclude_dirs = tests, logs, bin, venv, build, dist, patches, .venv, venv,
 
 # (str) Application versioning (method 2)
 version.regex = __version__ = ['"](.*)['"]
-version.filename = %(source.dir)s/main.py
+version.filename = %(source.dir)s/services/config.py
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy

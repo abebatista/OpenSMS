@@ -19,9 +19,9 @@ except ImportError:
 # local imports
 from services.postApi import PosiApiServer, set_api_logger
 from services.logSvc import LogService
+from services.config import app_name
 
 # global vars
-app_name = "opensms"
 resp_template = {
     "server": "none",
 }
