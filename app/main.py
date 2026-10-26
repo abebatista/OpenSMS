@@ -31,11 +31,12 @@ from kivymd.uix.button import MDButton, MDButtonIcon, MDButtonText
 from kivymd.uix.dialog import MDDialog, MDDialogHeadlineText, MDDialogSupportingText, MDDialogButtonContainer, MDDialogContentContainer
 
 # import screens (else pyinstaller may ignore it)
-from screens.mainScr import ButtonControl
+from screens.mainScr import ButtonControl, EndPointUrl, DocButton
 from screens.settings import SettingsBox, ApiKeyTxtbox
 
 # import services
 from services.postApi import get_api_keys, generate_new_api_key
+from services.netSvc import get_network_ips
 
 # IMPORTANT: Set this property for keyboard behavior
 Window.softinput_mode = "below_target"
@@ -217,7 +218,8 @@ class OpenSmsApp(MDApp):
                                 api_srv_btn.btn_icon = "stop"
                                 api_srv_btn.btn_txt = "Stop Server"
                                 api_srv_btn.md_bg_color = "orange"
-                                Clock.schedule_once(lambda dt: self.show_toast_msg("API Server Started"))
+                                Clock.schedule_once(lambda dt: self.update_api_details())
+                                #Clock.schedule_once(lambda dt: self.show_toast_msg("API Server Started"))
                         elif server_stat == "stopped":
                             if self.api_started:
                                 self.api_started = False
@@ -225,7 +227,8 @@ class OpenSmsApp(MDApp):
                                 api_srv_btn.btn_icon = "play"
                                 api_srv_btn.btn_txt = "Start Server"
                                 api_srv_btn.md_bg_color = "green"
-                                Clock.schedule_once(lambda dt: self.show_toast_msg("API Server Stopped"))
+                                Clock.schedule_once(lambda dt: self.clear_api_details())
+                                #Clock.schedule_once(lambda dt: self.show_toast_msg("API Server Stopped"))
                 except Exception as e:
                     print(f"Error while reading resp: {e}")
             time.sleep(2)
@@ -237,6 +240,39 @@ class OpenSmsApp(MDApp):
     def write_request(self):
         with open(self.request_path, "w") as rf:
             json.dump(self.req_template, rf)
+
+    def clear_api_details(self):
+        endpoint_box = self.root.ids.home_scr.ids.endpoint_box
+        endpoint_box.clear_widgets()
+
+    def update_api_details(self):
+        ip_map = get_network_ips()
+        port_no = self.config_template["port"]
+        endpoint_box = self.root.ids.home_scr.ids.endpoint_box
+        doc_btn = DocButton()
+        endpoint_box.add_widget(doc_btn)
+        iface_widget = EndPointUrl()
+        iface_widget.url = f"http://127.0.0.1:{port_no}/sms"
+        iface_widget.iface_name = "localhost"
+        endpoint_box.add_widget(iface_widget)
+        # WiFi interfaces
+        for wifi_iface in ip_map["wifi"]:
+            iface_name = wifi_iface.get("interface", "")
+            ip_addr = wifi_iface["ip"]
+            url = f"http://{ip_addr}:{port_no}/sms"
+            iface_widget = EndPointUrl()
+            iface_widget.url = url
+            iface_widget.iface_name = f"WiFi: {iface_name}"
+            endpoint_box.add_widget(iface_widget)
+        # Ethernet interfaces
+        for eth_iface in ip_map["ethernet"]:
+            iface_name = eth_iface.get("interface", "")
+            ip_addr = eth_iface["ip"]
+            url = f"http://{ip_addr}:{port_no}/sms"
+            iface_widget = EndPointUrl()
+            iface_widget.url = url
+            iface_widget.iface_name = f"Eth: {iface_name}"
+            endpoint_box.add_widget(iface_widget)
 
     def api_server_mgr(self, instance=None):
         permissions_ok = self.check_request_android_permission()
@@ -421,6 +457,15 @@ class OpenSmsApp(MDApp):
             Clipboard.copy(self.api_key)
         self.txt_dialog_closer()
         Clock.schedule_once(lambda dt: self.show_toast_msg("API Key has been copied, store it securely."))
+
+    def api_doc_link(self, instance=None):
+        port_no = self.config_template["port"]
+        self.open_link(instance, f"http://127.0.0.1:{port_no}/docs")
+
+    def open_link(self, instance=None, url=None):
+        if url:
+            import webbrowser
+            webbrowser.open(url)
 
     ## Settings sections
     def save_settings(self, instance=None, control_txt="none"):

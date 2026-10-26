@@ -96,9 +96,12 @@ def get_api_keys() -> dict:
 class SmsData(BaseModel):
     number: str
     text: str
-    sub_text: str | None = None
+    #sub_text: str | None = None
 
 class ControlData(BaseModel):
+    """
+    This is not yet implemented. Placeholder only.
+    """
     api: str
 
 # FastAPI app
