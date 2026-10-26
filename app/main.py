@@ -1,7 +1,7 @@
 import os
 os.environ['KIVY_GL_BACKEND'] = 'sdl2'
-from kivy.config import Config
-Config.set("graphics", "multisamples", "0")
+#from kivy.config import Config
+#Config.set("graphics", "multisamples", "0")
 import sys
 import json
 from threading import Thread
@@ -31,11 +31,12 @@ from kivymd.uix.button import MDButton, MDButtonIcon, MDButtonText
 from kivymd.uix.dialog import MDDialog, MDDialogHeadlineText, MDDialogSupportingText, MDDialogButtonContainer, MDDialogContentContainer
 
 # import screens (else pyinstaller may ignore it)
-from screens.mainScr import ButtonControl
+from screens.mainScr import ButtonControl, EndPointUrl, DocButton
 from screens.settings import SettingsBox, ApiKeyTxtbox
 
 # import services
-from services.postApi import get_api_keys, set_config_path, generate_new_api_key
+from services.postApi import get_api_keys, generate_new_api_key
+from services.netSvc import get_network_ips
 
 # IMPORTANT: Set this property for keyboard behavior
 Window.softinput_mode = "below_target"
@@ -74,7 +75,7 @@ class MainScreenBox(MDBoxLayout):
                 self.bottom_pad = 48
 
 ## Global definitions
-__version__ = "0.1.1" # App version
+__version__ = "0.2.0" # App version
 
 # Determine the base path for your application's resources
 if getattr(sys, 'frozen', False):
@@ -100,6 +101,7 @@ class OpenSmsApp(MDApp):
             "app": "opensms",
             "port": 9292,
             "boot": False,
+            "permissions": False,
         }
         self.req_template = {
             "port": 9292,
@@ -153,7 +155,6 @@ class OpenSmsApp(MDApp):
             self.write_request()
             Thread(target=app_service_thread, daemon=True).start()
         # All generic things
-        set_config_path(self.config_dir)
         self.app_config = os.path.join(self.config_dir, "config.json")
         auto_start_sw = self.root.ids.settings_scr.ids.auto_start_sw
         port_no_inp = self.root.ids.settings_scr.ids.port_no_inp
@@ -162,6 +163,7 @@ class OpenSmsApp(MDApp):
                 saved_config = json.load(cf)
             self.config_template["port"] = int(saved_config["port"])
             self.config_template["boot"] = saved_config["boot"]
+            self.config_template["permissions"] = saved_config.get("permissions", False)
             print(f"start config check: {self.config_template}")
             self.req_template["port"] = int(self.config_template["port"])
             start_on_launch = self.config_template["boot"]
@@ -216,7 +218,8 @@ class OpenSmsApp(MDApp):
                                 api_srv_btn.btn_icon = "stop"
                                 api_srv_btn.btn_txt = "Stop Server"
                                 api_srv_btn.md_bg_color = "orange"
-                                Clock.schedule_once(lambda dt: self.show_toast_msg("API Server Started"))
+                                Clock.schedule_once(lambda dt: self.update_api_details())
+                                #Clock.schedule_once(lambda dt: self.show_toast_msg("API Server Started"))
                         elif server_stat == "stopped":
                             if self.api_started:
                                 self.api_started = False
@@ -224,7 +227,8 @@ class OpenSmsApp(MDApp):
                                 api_srv_btn.btn_icon = "play"
                                 api_srv_btn.btn_txt = "Start Server"
                                 api_srv_btn.md_bg_color = "green"
-                                Clock.schedule_once(lambda dt: self.show_toast_msg("API Server Stopped"))
+                                Clock.schedule_once(lambda dt: self.clear_api_details())
+                                #Clock.schedule_once(lambda dt: self.show_toast_msg("API Server Stopped"))
                 except Exception as e:
                     print(f"Error while reading resp: {e}")
             time.sleep(2)
@@ -236,6 +240,39 @@ class OpenSmsApp(MDApp):
     def write_request(self):
         with open(self.request_path, "w") as rf:
             json.dump(self.req_template, rf)
+
+    def clear_api_details(self):
+        endpoint_box = self.root.ids.home_scr.ids.endpoint_box
+        endpoint_box.clear_widgets()
+
+    def update_api_details(self):
+        ip_map = get_network_ips()
+        port_no = self.config_template["port"]
+        endpoint_box = self.root.ids.home_scr.ids.endpoint_box
+        doc_btn = DocButton()
+        endpoint_box.add_widget(doc_btn)
+        iface_widget = EndPointUrl()
+        iface_widget.url = f"http://127.0.0.1:{port_no}/sms"
+        iface_widget.iface_name = "localhost"
+        endpoint_box.add_widget(iface_widget)
+        # WiFi interfaces
+        for wifi_iface in ip_map["wifi"]:
+            iface_name = wifi_iface.get("interface", "")
+            ip_addr = wifi_iface["ip"]
+            url = f"http://{ip_addr}:{port_no}/sms"
+            iface_widget = EndPointUrl()
+            iface_widget.url = url
+            iface_widget.iface_name = f"WiFi: {iface_name}"
+            endpoint_box.add_widget(iface_widget)
+        # Ethernet interfaces
+        for eth_iface in ip_map["ethernet"]:
+            iface_name = eth_iface.get("interface", "")
+            ip_addr = eth_iface["ip"]
+            url = f"http://{ip_addr}:{port_no}/sms"
+            iface_widget = EndPointUrl()
+            iface_widget.url = url
+            iface_widget.iface_name = f"Eth: {iface_name}"
+            endpoint_box.add_widget(iface_widget)
 
     def api_server_mgr(self, instance=None):
         permissions_ok = self.check_request_android_permission()
@@ -253,7 +290,7 @@ class OpenSmsApp(MDApp):
             self.new_api_key_pop()
 
     def check_request_android_permission(self):
-        if platform == "android":
+        if platform == "android" and not self.config_template["permissions"]:
             permission_flag = True
             for permission in self.android_permissions:
                 tmp_flag = check_permission(permission)
@@ -296,9 +333,18 @@ class OpenSmsApp(MDApp):
             ),
             MDButton(
                 MDButtonText(
-                    text="Open Settings",
+                    text="Already granted",
                     theme_text_color= "Custom",
                     text_color= "orange"
+                ),
+                style="text",
+                on_release=self.confirm_android_permissions
+            ),
+            MDButton(
+                MDButtonText(
+                    text="Open Settings",
+                    theme_text_color= "Custom",
+                    text_color= "green"
                 ),
                 style="text",
                 on_release=self.open_android_settings
@@ -311,6 +357,10 @@ class OpenSmsApp(MDApp):
             None,
             buttons
         )
+
+    def confirm_android_permissions(self, instnce=None):
+        self.config_template["permissions"] = True
+        Thread(target=self.write_app_conf, daemon=True).start()
 
     def open_android_settings(self, instance=None):
         self.txt_dialog_closer()
@@ -407,6 +457,15 @@ class OpenSmsApp(MDApp):
             Clipboard.copy(self.api_key)
         self.txt_dialog_closer()
         Clock.schedule_once(lambda dt: self.show_toast_msg("API Key has been copied, store it securely."))
+
+    def api_doc_link(self, instance=None):
+        port_no = self.config_template["port"]
+        self.open_link(instance, f"http://127.0.0.1:{port_no}/docs")
+
+    def open_link(self, instance=None, url=None):
+        if url:
+            import webbrowser
+            webbrowser.open(url)
 
     ## Settings sections
     def save_settings(self, instance=None, control_txt="none"):

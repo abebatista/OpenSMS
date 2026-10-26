@@ -3,6 +3,7 @@ from kivymd.uix.scrollview import MDScrollView
 from kivymd.uix.gridlayout import MDGridLayout
 from kivymd.uix.button import MDButton, MDButtonIcon, MDButtonText
 from kivymd.uix.textfield import MDTextField, MDTextFieldTrailingIcon
+from kivymd.uix.list import MDListItem
 
 from kivy.lang import Builder
 from kivy.uix.widget import Widget
@@ -80,16 +81,16 @@ Builder.load_string('''
 
             MDListItem:
                 MDListItemLeadingIcon:
-                    icon: "api"
+                    icon: "server-network"
                 MDListItemHeadlineText:
                     text: "Port Number"
                 MDListItemSupportingText:
-                    text: "Needs a Stop-Start"
+                    text: "(1025 - 65535)"
                 MDListItemTertiaryText:
-                    text: "Should be > 1024"
+                    text: "Restart the server"
                 MDTextField:
                     id: port_no_inp
-                    mode: "filled"
+                    mode: "outlined"
                     input_filter: 'int'
 
             MDListItem:
