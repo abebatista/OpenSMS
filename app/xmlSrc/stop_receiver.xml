@@ -1,0 +1,4 @@
+<receiver
+            android:name="in.daslearning.opensms.StopServiceReceiver"
+            android:enabled="true"
+            android:exported="false" />

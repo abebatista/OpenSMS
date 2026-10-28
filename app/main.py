@@ -608,7 +608,7 @@ class OpenSmsApp(MDApp):
     def on_stop(self):
         print("Exiting the app...")
         if platform == "android":
-            self.stop_service()
+            #self.stop_service()
             self.release_wakelock()
 
     # on bottom navigation
