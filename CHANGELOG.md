@@ -3,8 +3,9 @@
 ## Changes
 
 ### 0.3.0
-- Service type is sticky now, should restart automatically unless stopped.
-- Trying a stop button at notification.
+- Service type is sticky now, should restart automatically unless stopped. [android]
+- Service should run even when app is closed. [android]
+- Added a stop button at notification to stop the service. [android]
 
 ### 0.2.1
 - Fixing permission requirement as per Android version.

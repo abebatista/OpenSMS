@@ -98,6 +98,7 @@ class OpenSmsApp(MDApp):
         self.resp_thred = None
         self.txt_dialog = None
         self.wake_lock = None
+        self.service_stat = False
         self.api_started = False
         self.key_exists = False
         self.api_key = None
@@ -144,8 +145,6 @@ class OpenSmsApp(MDApp):
             os.makedirs(self.config_dir, exist_ok=True)
             self.request_path = os.path.join(self.config_dir, "request.json")
             self.resp_path = os.path.join(self.config_dir, "resp.json")
-            if os.path.exists(self.resp_path):
-                os.remove(self.resp_path) # cleans the resp
             svc_running = False
             # start the listner service on Android
             try:
@@ -153,6 +152,8 @@ class OpenSmsApp(MDApp):
                 if not svc_running:
                     self.write_request() # cleans the request file
                     self.start_service()
+                else:
+                    self.service_stat = True
             except Exception as e:
                 print(f"Error while starting android service: {e}")
         # non android platforms
@@ -222,18 +223,24 @@ class OpenSmsApp(MDApp):
         print(f"PYTHON_SERVICE_ARGUMENT: {argument}")
         #service.start(mActivity, argument)
         service.start(mActivity, 'icon', 'OpenSMS API', 'Service Running' , argument)
+        self.service_stat = True
 
     def stop_service(self):
         service = autoclass('in.daslearning.opensms.ServiceOpensmssvc')
         PythonActivity = autoclass('org.kivy.android.PythonActivity')
         mActivity = PythonActivity.mActivity
         service.stop(mActivity)
+        self.service_stat = False
 
     def resp_check_loop(self):
+        self.api_started = False
         import time
         api_srv_btn = self.root.ids.home_scr.ids.api_srv_btn
         api_srv_lbl = self.root.ids.home_scr.ids.api_srv_lbl
         time.sleep(0.5) # A delay for the android service to kick in
+        # debug
+        print_path = os.path.abspath(self.resp_path)
+        print(f"RESP Path: {print_path}")
         while True:
             resp = None
             if os.path.exists(self.resp_path):
@@ -241,7 +248,7 @@ class OpenSmsApp(MDApp):
                     with open(self.resp_path, "r", encoding="utf-8") as rf:
                         resp = json.load(rf)
                     if resp:
-                        server_stat = resp.get("server", "")
+                        server_stat = resp.get("server", "unknown")
                         if server_stat == "started":
                             if not self.api_started:
                                 self.api_started = True
@@ -260,8 +267,12 @@ class OpenSmsApp(MDApp):
                                 api_srv_btn.md_bg_color = "green"
                                 Clock.schedule_once(lambda dt: self.clear_api_details())
                                 #Clock.schedule_once(lambda dt: self.show_toast_msg("API Server Stopped"))
+                    else:
+                        api_srv_lbl.text = "Unable to get response from service"
                 except Exception as e:
                     print(f"Error while reading resp: {e}")
+            else:
+                api_srv_lbl.text = "RESP Path doesn't exist!"
             time.sleep(2)
 
     def write_app_conf(self):
@@ -277,6 +288,7 @@ class OpenSmsApp(MDApp):
         endpoint_box.clear_widgets()
 
     def update_api_details(self):
+        self.clear_api_details()
         ip_map = get_network_ips()
         port_no = self.config_template["port"]
         endpoint_box = self.root.ids.home_scr.ids.endpoint_box
@@ -311,6 +323,8 @@ class OpenSmsApp(MDApp):
             return
         key_ok = self.check_if_key_exists()
         if key_ok:
+            if not self.service_stat:
+                self.start_service()
             if not self.api_started:
                 self.req_template["server"] = "start"
                 self.write_request()
