@@ -4,6 +4,8 @@ from threading import Thread
 import json
 import time
 import sys
+import signal
+
 
 # OS specific
 try:
@@ -19,15 +21,25 @@ except ImportError:
 # local imports
 from services.postApi import PosiApiServer, set_api_logger
 from services.logSvc import LogService
+from services.config import app_name
 
 # global vars
-app_name = "opensms"
 resp_template = {
     "server": "none",
 }
 req_data = {}
 api_started = False
 log_obj = LogService(app_name, platform)
+
+running = True
+def request_stop(signum=None, frame=None):
+    global running
+    print("Stop signal received")
+    running = False
+
+# Stop signal handle
+signal.signal(signal.SIGTERM, request_stop)
+signal.signal(signal.SIGINT, request_stop)
 
 ## OS specific setups
 
@@ -96,18 +108,27 @@ def app_service_thread():
     #api_server_control("start") # api server starts automatically
 
     # keep alive the service & check for requests
-    while True:
-        read_req_file()
+    try:
+        while running:
+            read_req_file()
 
-        #handle api server
-        server_stat = req_data.get("server", "")
-        if not api_started and server_stat == "start":
-            api_server_control("start")
-        elif api_started and server_stat == "stop":
+            #handle api server
+            server_stat = req_data.get("server", "")
+            if not api_started and server_stat == "start":
+                api_server_control("start")
+            elif api_started and server_stat == "stop":
+                api_server_control("stop")
+
+            # put a sleep
+            time.sleep(0.2)
+    # Exceptions and closure
+    except Exception as e:
+        print(f"Error in service loop: {e}")
+    finally:
+        # Stop the API server if it is still running
+        if api_started:
             api_server_control("stop")
-
-        # put a sleep
-        time.sleep(0.2)
+        print("OpenSMS service stopped")
 
 
 # run locally

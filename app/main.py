@@ -16,10 +16,13 @@ from kivy.clock import Clock
 from kivy.properties import StringProperty, NumericProperty, ObjectProperty, BooleanProperty, ColorProperty
 
 # debug
-from kivy.graphics.opengl import glGetString, GL_VENDOR, GL_RENDERER, GL_VERSION
-print("GL_VENDOR:", glGetString(GL_VENDOR))
-print("GL_RENDERER:", glGetString(GL_RENDERER))
-print("GL_VERSION:", glGetString(GL_VERSION))
+try:
+    from kivy.graphics.opengl import glGetString, GL_VENDOR, GL_RENDERER, GL_VERSION
+    print("GL_VENDOR:", glGetString(GL_VENDOR))
+    print("GL_RENDERER:", glGetString(GL_RENDERER))
+    print("GL_VERSION:", glGetString(GL_VERSION))
+except Exception as e:
+    print(f"OpenGL query error: {e}")
 
 from kivymd.uix.widget import MDWidget
 from kivymd.app import MDApp
@@ -37,6 +40,7 @@ from screens.settings import SettingsBox, ApiKeyTxtbox
 # import services
 from services.postApi import get_api_keys, generate_new_api_key
 from services.netSvc import get_network_ips
+from services.config import __version__, app_name
 
 # IMPORTANT: Set this property for keyboard behavior
 Window.softinput_mode = "below_target"
@@ -75,7 +79,6 @@ class MainScreenBox(MDBoxLayout):
                 self.bottom_pad = 48
 
 ## Global definitions
-__version__ = "0.2.0" # App version
 
 # Determine the base path for your application's resources
 if getattr(sys, 'frozen', False):
@@ -92,13 +95,15 @@ class OpenSmsApp(MDApp):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         Window.bind(on_keyboard=self.events)
+        self.resp_thred = None
         self.txt_dialog = None
         self.wake_lock = None
+        self.service_stat = False
         self.api_started = False
         self.key_exists = False
         self.api_key = None
         self.config_template = {
-            "app": "opensms",
+            "app": app_name,
             "port": 9292,
             "boot": False,
             "permissions": False,
@@ -116,12 +121,13 @@ class OpenSmsApp(MDApp):
     ## App logics
     def on_start(self):
         # paths setup
+        self.api_started = False
         file_m_height = 1
         # for android
         if platform == "android":
             file_m_height = 0.9
             from android.storage import app_storage_path
-            sdk_version = 28
+            sdk_version = 33
             try:
                 VERSION = autoclass('android.os.Build$VERSION')
                 sdk_version = VERSION.SDK_INT
@@ -130,19 +136,24 @@ class OpenSmsApp(MDApp):
             except Exception as e:
                 print(f"Could not check the android SDK version: {e}")
                 #self.show_toast_msg(f"Error checking SDK: {e}", is_error=True)
-            self.android_permissions = [Permission.WAKE_LOCK, Permission.SEND_SMS, Permission.POST_NOTIFICATIONS]
+            self.android_permissions = [Permission.WAKE_LOCK, Permission.SEND_SMS]
+            if sdk_version >= 33:
+                self.android_permissions.extend([Permission.POST_NOTIFICATIONS])
             request_permissions(self.android_permissions)
             self.internal_storage = app_storage_path()
             self.config_dir = os.path.join(self.internal_storage, 'config')
             os.makedirs(self.config_dir, exist_ok=True)
             self.request_path = os.path.join(self.config_dir, "request.json")
             self.resp_path = os.path.join(self.config_dir, "resp.json")
-            if os.path.exists(self.resp_path):
-                os.remove(self.resp_path) # cleans the resp
-            self.write_request() # cleans the request file
+            svc_running = False
             # start the listner service on Android
             try:
-                self.start_service()
+                svc_running = self.is_service_running()
+                if not svc_running:
+                    self.write_request() # cleans the request file
+                    self.start_service()
+                else:
+                    self.service_stat = True
             except Exception as e:
                 print(f"Error while starting android service: {e}")
         # non android platforms
@@ -159,7 +170,7 @@ class OpenSmsApp(MDApp):
         auto_start_sw = self.root.ids.settings_scr.ids.auto_start_sw
         port_no_inp = self.root.ids.settings_scr.ids.port_no_inp
         if os.path.exists(self.app_config):
-            with open(self.app_config, "r") as cf:
+            with open(self.app_config, "r", encoding="utf-8") as cf:
                 saved_config = json.load(cf)
             self.config_template["port"] = int(saved_config["port"])
             self.config_template["boot"] = saved_config["boot"]
@@ -179,8 +190,29 @@ class OpenSmsApp(MDApp):
         api_keys = get_api_keys()
         if len(api_keys) >= 1:
             self.key_exists = True
-        Thread(target=self.resp_check_loop, daemon=True).start()
+        self.stop_resp_loop()
+        self.resp_thred = Thread(target=self.resp_check_loop, daemon=True)
+        self.resp_thred.start()
         print("Init success...")
+
+    def is_service_running(self):
+        if platform == "android":
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            Context = autoclass('android.content.Context')
+            ActivityManager = autoclass('android.app.ActivityManager')
+            activity = PythonActivity.mActivity
+            manager = activity.getSystemService(
+                Context.ACTIVITY_SERVICE
+            )
+            services = manager.getRunningServices(1000)
+            for service_info in services.toArray():
+                if str(service_info.service.getClassName()) == (
+                    'in.daslearning.opensms.ServiceOpensmssvc'
+                ):
+                    return True
+            return False
+        else:
+            return False
 
     def start_service(self):
         PythonActivity = autoclass('org.kivy.android.PythonActivity')
@@ -191,26 +223,32 @@ class OpenSmsApp(MDApp):
         print(f"PYTHON_SERVICE_ARGUMENT: {argument}")
         #service.start(mActivity, argument)
         service.start(mActivity, 'icon', 'OpenSMS API', 'Service Running' , argument)
+        self.service_stat = True
 
     def stop_service(self):
         service = autoclass('in.daslearning.opensms.ServiceOpensmssvc')
         PythonActivity = autoclass('org.kivy.android.PythonActivity')
         mActivity = PythonActivity.mActivity
         service.stop(mActivity)
+        self.service_stat = False
 
     def resp_check_loop(self):
+        self.api_started = False
         import time
         api_srv_btn = self.root.ids.home_scr.ids.api_srv_btn
         api_srv_lbl = self.root.ids.home_scr.ids.api_srv_lbl
         time.sleep(0.5) # A delay for the android service to kick in
+        # debug
+        print_path = os.path.abspath(self.resp_path)
+        print(f"RESP Path: {print_path}")
         while True:
             resp = None
             if os.path.exists(self.resp_path):
                 try:
-                    with open(self.resp_path, "r") as rf:
+                    with open(self.resp_path, "r", encoding="utf-8") as rf:
                         resp = json.load(rf)
                     if resp:
-                        server_stat = resp.get("server", "")
+                        server_stat = resp.get("server", "unknown")
                         if server_stat == "started":
                             if not self.api_started:
                                 self.api_started = True
@@ -229,8 +267,12 @@ class OpenSmsApp(MDApp):
                                 api_srv_btn.md_bg_color = "green"
                                 Clock.schedule_once(lambda dt: self.clear_api_details())
                                 #Clock.schedule_once(lambda dt: self.show_toast_msg("API Server Stopped"))
+                    else:
+                        api_srv_lbl.text = "Unable to get response from service"
                 except Exception as e:
                     print(f"Error while reading resp: {e}")
+            else:
+                api_srv_lbl.text = "RESP Path doesn't exist!"
             time.sleep(2)
 
     def write_app_conf(self):
@@ -246,6 +288,7 @@ class OpenSmsApp(MDApp):
         endpoint_box.clear_widgets()
 
     def update_api_details(self):
+        self.clear_api_details()
         ip_map = get_network_ips()
         port_no = self.config_template["port"]
         endpoint_box = self.root.ids.home_scr.ids.endpoint_box
@@ -280,6 +323,8 @@ class OpenSmsApp(MDApp):
             return
         key_ok = self.check_if_key_exists()
         if key_ok:
+            if not self.service_stat:
+                self.start_service()
             if not self.api_started:
                 self.req_template["server"] = "start"
                 self.write_request()
@@ -599,11 +644,25 @@ class OpenSmsApp(MDApp):
         # exits from app
         return False
 
+    def stop_resp_loop(self):
+        if self.resp_thred:
+            self.resp_thred.join(timeout=5)
+        self.resp_thred = None
+
+    def on_pause(self):
+        self.stop_resp_loop()
+        return True
+
+    def on_resume(self):
+        self.stop_resp_loop()
+        self.resp_thred = Thread(target=self.resp_check_loop, daemon=True)
+        self.resp_thred.start()
+
     # run on app exit
     def on_stop(self):
         print("Exiting the app...")
         if platform == "android":
-            self.stop_service()
+            #self.stop_service()
             self.release_wakelock()
 
     # on bottom navigation

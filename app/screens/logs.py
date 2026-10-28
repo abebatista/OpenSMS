@@ -13,6 +13,7 @@ from kivy.utils import platform
 
 # local imports
 from services.logSvc import LogService
+from services.config import app_name
 
 Builder.load_string('''
 
@@ -41,7 +42,7 @@ class LogBox(MDBoxLayout):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.app_name = "opensms"
+        self.app_name = app_name
         self.top_menu_items = {
             "Refresh": {
                 "icon": "refresh",

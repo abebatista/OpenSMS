@@ -8,6 +8,7 @@ An open-source solution to host a `SMS` API server locally.
 
   - It is meant to be used with a backend or application layer in the local network while `OpenSMS` serves as the SMS gateway / API.
   - To keep it simple, rate limiting or other restrictions may be applied at the application layer (not adding in `OpenSMS` app itself).
+  - It uses the default `SIM` for sending sms as set in the android settings.
 </details>
 
 

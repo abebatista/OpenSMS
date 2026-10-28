@@ -15,6 +15,7 @@ import uvicorn
 # local imports
 from services.smsApi import send_sms, clean_and_validate_phone
 from services.logSvc import LogService
+from services.config import app_name
 
 # OS specific
 try:
@@ -28,7 +29,6 @@ except ImportError:
         platform = "unknown"
 
 ## global vars / obj
-app_name = "opensms"
 logger = None
 
 ## OS specific setups

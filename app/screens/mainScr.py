@@ -154,7 +154,6 @@ class EndPointUrl(MDListItem):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.app_name = "opensms"
 
     def copy_url(self, instance=None):
         Clipboard.copy(self.url)

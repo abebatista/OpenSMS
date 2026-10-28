@@ -38,7 +38,7 @@ source.exclude_dirs = tests, logs, bin, venv, build, dist, patches, .venv, venv,
 
 # (str) Application versioning (method 2)
 version.regex = __version__ = ['"](.*)['"]
-version.filename = %(source.dir)s/main.py
+version.filename = %(source.dir)s/services/config.py
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
@@ -97,7 +97,7 @@ orientation = all
 # launched. This is optionally followed by ":foreground" for foreground services or
 # ":foreground:sticky" for sticky foreground services. The default is a background service.
 # Bound services are not supported.
-services = opensmssvc:services/appSvc.py:foreground:foregroundServiceType=dataSync
+services = opensmssvc:services/appSvc.py:foreground:sticky:foregroundServiceType=specialUse
 
 #
 # OSX Specific
@@ -135,7 +135,13 @@ icon.adaptive_background.filename = %(source.dir)s/data/images/icon_bg.png
 
 # (list) Permissions
 # (See https://python-for-android.readthedocs.io/en/latest/buildoptions.html for all the supported syntaxes and properties)
-android.permissions = android.permission.INTERNET, android.permission.SEND_SMS, android.permission.WAKE_LOCK, android.permission.FOREGROUND_SERVICE, android.permission.FOREGROUND_SERVICE_DATA_SYNC, android.permission.POST_NOTIFICATIONS
+android.permissions = android.permission.INTERNET,
+    android.permission.ACCESS_NETWORK_STATE,
+    android.permission.SEND_SMS,
+    android.permission.WAKE_LOCK,
+    android.permission.FOREGROUND_SERVICE,
+    android.permission.FOREGROUND_SERVICE_SPECIAL_USE,
+    android.permission.POST_NOTIFICATIONS
 
 # (list) features (adds uses-feature -tags to manifest)
 #android.features = android.hardware.usb.host
@@ -190,6 +196,8 @@ android.accept_sdk_license = True
 # use that parameter to provide a filename from where to load your custom XML arguments:
 #android.extra_manifest_application_arguments = ./src/android/extra_manifest_application_arguments.xml
 
+android.extra_manifest_application_xml = %(source.dir)s/xmlSrc/stop_receiver.xml
+
 # (str) Full name including package path of the Java class that implements Python Service
 # use that parameter to set custom Java class which extends PythonService
 #android.service_class_name = org.kivy.android.PythonService
@@ -217,7 +225,7 @@ android.accept_sdk_license = True
 
 # (list) List of Java files to add to the android project (can be java or a
 # directory containing the files)
-#android.add_src =
+android.add_src = ./javaSrc
 
 # (list) Android AAR archives to add
 #android.add_aars =
@@ -367,7 +375,7 @@ p4a.url = https://github.com/daslearning-org/p4a-unofficial.git
 #p4a.fork = kivy
 
 # (str) python-for-android branch to use, defaults to master
-p4a.branch = develop
+p4a.branch = dasfix
 
 # (str) python-for-android specific commit to use, defaults to HEAD, must be within p4a.branch
 #p4a.commit = HEAD
