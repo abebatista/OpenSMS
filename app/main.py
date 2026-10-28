@@ -120,6 +120,7 @@ class OpenSmsApp(MDApp):
     ## App logics
     def on_start(self):
         # paths setup
+        self.api_started = False
         file_m_height = 1
         # for android
         if platform == "android":
@@ -188,6 +189,7 @@ class OpenSmsApp(MDApp):
         api_keys = get_api_keys()
         if len(api_keys) >= 1:
             self.key_exists = True
+        self.stop_resp_loop()
         self.resp_thred = Thread(target=self.resp_check_loop, daemon=True)
         self.resp_thred.start()
         print("Init success...")
@@ -628,16 +630,17 @@ class OpenSmsApp(MDApp):
         # exits from app
         return False
 
-    def on_pause(self):
+    def stop_resp_loop(self):
         if self.resp_thred:
             self.resp_thred.join(timeout=5)
         self.resp_thred = None
+
+    def on_pause(self):
+        self.stop_resp_loop()
         return True
 
     def on_resume(self):
-        if self.resp_thred:
-            self.resp_thred.join(timeout=5)
-        self.resp_thred = None
+        self.stop_resp_loop()
         self.resp_thred = Thread(target=self.resp_check_loop, daemon=True)
         self.resp_thred.start()
 
