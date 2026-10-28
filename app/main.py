@@ -95,6 +95,7 @@ class OpenSmsApp(MDApp):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         Window.bind(on_keyboard=self.events)
+        self.resp_thred = None
         self.txt_dialog = None
         self.wake_lock = None
         self.api_started = False
@@ -144,10 +145,13 @@ class OpenSmsApp(MDApp):
             self.resp_path = os.path.join(self.config_dir, "resp.json")
             if os.path.exists(self.resp_path):
                 os.remove(self.resp_path) # cleans the resp
-            self.write_request() # cleans the request file
+            svc_running = False
             # start the listner service on Android
             try:
-                self.start_service()
+                svc_running = self.is_service_running()
+                if not svc_running:
+                    self.write_request() # cleans the request file
+                    self.start_service()
             except Exception as e:
                 print(f"Error while starting android service: {e}")
         # non android platforms
@@ -184,8 +188,28 @@ class OpenSmsApp(MDApp):
         api_keys = get_api_keys()
         if len(api_keys) >= 1:
             self.key_exists = True
-        Thread(target=self.resp_check_loop, daemon=True).start()
+        self.resp_thred = Thread(target=self.resp_check_loop, daemon=True)
+        self.resp_thred.start()
         print("Init success...")
+
+    def is_service_running(self):
+        if platform == "android":
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            Context = autoclass('android.content.Context')
+            ActivityManager = autoclass('android.app.ActivityManager')
+            activity = PythonActivity.mActivity
+            manager = activity.getSystemService(
+                Context.ACTIVITY_SERVICE
+            )
+            services = manager.getRunningServices(1000)
+            for service_info in services.toArray():
+                if str(service_info.service.getClassName()) == (
+                    'in.daslearning.opensms.ServiceOpensmssvc'
+                ):
+                    return True
+            return False
+        else:
+            return False
 
     def start_service(self):
         PythonActivity = autoclass('org.kivy.android.PythonActivity')
@@ -603,6 +627,19 @@ class OpenSmsApp(MDApp):
             return True
         # exits from app
         return False
+
+    def on_pause(self):
+        if self.resp_thred:
+            self.resp_thred.join(timeout=5)
+        self.resp_thred = None
+        return True
+
+    def on_resume(self):
+        if self.resp_thred:
+            self.resp_thred.join(timeout=5)
+        self.resp_thred = None
+        self.resp_thred = Thread(target=self.resp_check_loop, daemon=True)
+        self.resp_thred.start()
 
     # run on app exit
     def on_stop(self):

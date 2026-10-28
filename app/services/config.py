@@ -1,2 +1,2 @@
-__version__ = "0.2.1" # App version
+__version__ = "0.3.0" # App version
 app_name = "opensms"
